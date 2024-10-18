@@ -6,62 +6,82 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-model User {
-  id        String   @id @default(cuid())
-  clerkId   String   @unique
-  email     String   @unique
-  name      String?
-  role      Role     @default(EMPLOYEE)
-  kudos     Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  votes     Vote[]
-  polls     Poll[]   @relation("CreatedBy")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Poll {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  startDate   DateTime
-  endDate     DateTime
-  createdBy   User      @relation("CreatedBy", fields: [createdById], references: [id])
-  createdById String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  options     Option[]
-  votes       Vote[]
+  id              String              @id @default(cuid())
+  title           String
+  description     String?
+  startDate       DateTime
+  endDate         DateTime
+  createdBy       User                @relation("PollCreatedBy", fields: [createdById], references: [id])
+  createdById     String
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  options         SuggestionOption[]  @relation("PollSuggestions")
+  votes           Vote[]
+  tags            PollTag[]           @relation("PollTags")
+  allowSuggestions Boolean            @default(false)
+  maxSuggestions  Int?                
+  status          PollStatus          @default(DRAFT) 
 }
 
-model Option {
+model SuggestionOption {
   id        String   @id @default(cuid())
   text      String
-  poll      Poll     @relation(fields: [pollId], references: [id])
+  poll      Poll     @relation("PollSuggestions", fields: [pollId], references: [id], onDelete: Cascade)
   pollId    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  votes     Vote[]
+  createdBy User     @relation("UserCreatedSuggestions", fields: [createdById], references: [id]) // Named relation for user-created suggestions
+  createdById String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  votes      Vote[]   // Reverse relation to votes
+}
+
+model User {
+  id              String   @id @default(cuid())
+  clerkId         String   @unique
+  email           String   @unique
+  name            String?
+  role            Role     @default(EMPLOYEE)
+  kudos           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  votes           Vote[]
+  polls           Poll[]   @relation("PollCreatedBy")
+  suggestions     SuggestionOption[] @relation("UserCreatedSuggestions") // Reverse relation named for user-created suggestions
 }
 
 model Vote {
-  id        String   @id @default(cuid())
-  user      User     @relation(fields: [userId], references: [id])
-  userId    String
-  poll      Poll     @relation(fields: [pollId], references: [id])
-  pollId    String
-  option    Option   @relation(fields: [optionId], references: [id])
-  optionId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String            @id @default(cuid())
+  user           User              @relation(fields: [userId], references: [id])
+  userId         String
+  poll           Poll              @relation(fields: [pollId], references: [id])
+  pollId         String
+  suggestion     SuggestionOption  @relation(fields: [suggestionId], references: [id])
+  suggestionId   String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   @@unique([userId, pollId])
 }
 
+model PollTag {
+  id    String  @id @default(cuid())
+  name  String  @unique
+  polls Poll[]  @relation("PollTags")
+}
+
+enum PollStatus {
+  DRAFT
+  PUBLISHED
+}
+
 enum Role {
+  SUPERADMIN
   ADMIN
   EMPLOYEE
 }
